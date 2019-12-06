@@ -1,16 +1,13 @@
 package export
 
 import (
-	"encoding/json"
-	"github.com/BinJu/vault-secret-migrator/client"
+	"fmt"
 	"io"
 	"strings"
-)
 
-type VaultSecret struct {
-	Path string `json:"path"`
-	Value string `json:"value"`
-}
+	"github.com/BinJu/vault-secret-migrator/client"
+	"github.com/BinJu/vault-secret-migrator/record"
+)
 
 type Exporter interface {
 	Export(path string, writer io.Writer) error
@@ -23,13 +20,12 @@ type exporter struct {
 func NewExporter(client client.Vault) Exporter {
 	return &exporter{client}
 }
-func (e *exporter)Export(path string, writer io.Writer) error {
+func (e *exporter) Export(path string, writer io.Writer) error {
 	secretsList, err := e.client.List(path)
 	if err != nil {
 		return err
 	}
 
-	data := [] VaultSecret {}
 	dirs := []string{}
 
 	secrets := strings.Split(secretsList, "\n")
@@ -42,18 +38,12 @@ func (e *exporter)Export(path string, writer io.Writer) error {
 			if err != nil {
 				return err
 			}
-			kv := VaultSecret{Path: realPath, Value: value}
-			data = append(data, kv)
+			kv := record.VaultSecret{Path: realPath, Value: value}
+			fmt.Fprint(writer, kv.String())
 		}
 
 	}
 
-	output, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	writer.Write(output[1: len(output)-2])
 	for _, dir := range dirs {
 		e.Export(dir, writer)
 	}
