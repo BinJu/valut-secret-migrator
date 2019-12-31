@@ -36,14 +36,14 @@ func NewVaultSecretFromString(secretKV string) (*VaultSecret, error) {
 	return &vaultSecret, nil
 }
 
-func NewMultiVaultSecretsFromString(text string) ([]*VaultSecret, error) {
+func NewMultiVaultSecretsFromString(text string) ([]*VaultSecret, []byte, error) {
 	secrets := []*VaultSecret{}
 	for {
 		idx := strings.Index(text, "$$\n")
 		if idx > 0 {
 			secret, err := NewVaultSecretFromString(text[0:idx])
 			if err != nil {
-				return secrets, err
+				return secrets, nil, err
 			}
 			secrets = append(secrets, secret)
 			if idx+3 >= len(text) {
@@ -52,10 +52,10 @@ func NewMultiVaultSecretsFromString(text string) ([]*VaultSecret, error) {
 				text = text[idx+3:]
 			}
 		} else {
-			break
+			return secrets, []byte(text), nil
 		}
 	}
-	return secrets, nil
+	return secrets, nil, nil
 }
 
 func RecordSeparator() string {
