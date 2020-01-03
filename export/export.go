@@ -17,6 +17,8 @@ type exporter struct {
 	client client.Vault
 }
 
+var gExportCount int64 = 0
+
 func NewExporter(client client.Vault) Exporter {
 	return &exporter{client}
 }
@@ -24,6 +26,10 @@ func NewExporter(client client.Vault) Exporter {
 func (e *exporter) Export(path string, writer io.Writer) error {
 	dirs := []string{path}
 	return e.export_func(dirs, writer)
+}
+
+func Count() int64 {
+	return gExportCount
 }
 
 func (e *exporter) export_func(paths []string, writer io.Writer) error {
@@ -35,6 +41,10 @@ func (e *exporter) export_func(paths []string, writer io.Writer) error {
 		}
 		secrets := strings.Split(secretsList, "\n")
 		for _, secret := range secrets[2:] {
+			if secret == "" {
+				continue
+			}
+
 			realPath := path + "/" + secret
 			if realPath[len(realPath)-1] == '/' { //a path
 				dirs = append(dirs, realPath[0:len(realPath)-1])
@@ -43,13 +53,13 @@ func (e *exporter) export_func(paths []string, writer io.Writer) error {
 				if err != nil {
 					return err
 				}
+				gExportCount += 1
 				kv := record.VaultSecret{Path: realPath, Value: value}
 				_, err = fmt.Fprint(writer, kv.String())
 				if err != nil {
 					return err
 				}
 			}
-
 		}
 	}
 	if len(dirs) > 0 {

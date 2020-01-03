@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/BinJu/vault-secret-migrator/client"
 	"github.com/BinJu/vault-secret-migrator/export"
-	"os"
 )
 
 func main() {
@@ -18,4 +19,7 @@ func main() {
 	if err != nil {
 		fmt.Println("Error:", err)
 	}
+
+	count := export.Count()
+	fmt.Printf("%d credentials are exported\n", count)
 }
