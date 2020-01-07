@@ -2,8 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"flag"
 	"fmt"
-	"os"
 
 	"github.com/BinJu/vault-secret-migrator/client"
 	"github.com/BinJu/vault-secret-migrator/client/online"
@@ -11,22 +12,46 @@ import (
 
 const pathPrefix = "/v1"
 
+type vaultInfo struct {
+	Addr            string
+	IgnoreSSLVerify bool
+	Token           string
+}
+
+type rootPaths []string
+
+func (p *rootPaths) String() string {
+	return fmt.Sprintf("%v", *p)
+}
+func (p *rootPaths) Set(val string) error {
+	*p = append(*p, val)
+	return nil
+}
+
+type command struct {
+	Source    vaultInfo
+	Target    vaultInfo
+	DryRun    bool
+	Debug     bool
+	RootPaths rootPaths
+}
+
 func main() {
-	if len(os.Args) < 3 {
-		fmt.Println("<SRC VAULT> <DST VAULT>")
+	var cmd command
+	cmdErr := parseCommand(&cmd)
+	if cmdErr != nil {
+		fmt.Println("[ERROR]", cmdErr)
 		return
 	}
 
-	src := "https://127.0.0.1:8201"
-	dst := "https://127.0.0.1:8200"
-
 	migrator := &onlineMigrator{
-		source: online.NewVault(src, true, "7b35793c-a809-7406-b14c-73611506626a"),
-		dest:   online.NewVault(dst, true, "s.CAAuHWSvkHkdmmCLS123cT03"),
-		dryRun: true,
-		debug:  true,
+		source: online.NewVault(cmd.Source.Addr, cmd.Source.IgnoreSSLVerify, cmd.Source.Token), //"7b35793c-a809-7406-b14c-73611506626a"),
+		dest:   online.NewVault(cmd.Target.Addr, cmd.Target.IgnoreSSLVerify, cmd.Target.Token), //"s.CAAuHWSvkHkdmmCLS123cT03"),
+		dryRun: cmd.DryRun,
+		debug:  cmd.Debug,
 	}
-	migErr := migrator.Migrate("/concourse/main", "/concourse/shared")
+
+	migErr := migrator.Migrate(cmd.RootPaths...)
 	if migErr != nil {
 		fmt.Println("fail to migrate credentials. error:", migErr)
 	}
@@ -113,6 +138,50 @@ func (m *onlineMigrator) migrate_func(paths []string) error {
 	}
 	if len(dirs) > 0 {
 		return m.migrate_func(dirs)
+	}
+	return nil
+}
+
+func parseCommand(cmd *command) error {
+	flag.StringVar(&cmd.Source.Addr, "source-addr", "", "the source vault address")
+	flag.BoolVar(&cmd.Source.IgnoreSSLVerify, "source-ssl-verify", true, "ignore the ssl verification to the source vault")
+	flag.StringVar(&cmd.Source.Token, "source-token", "", "the token for the source vault")
+
+	flag.StringVar(&cmd.Target.Addr, "target-addr", "", "the target vault address")
+	flag.BoolVar(&cmd.Target.IgnoreSSLVerify, "target-ssl-verify", true, "ignore the ssl verification to the target vault")
+	flag.StringVar(&cmd.Target.Token, "target-token", "", "the token for the target vault")
+
+	flag.BoolVar(&cmd.DryRun, "dry-run", true, "dry run mode will not migrate data to target")
+	flag.BoolVar(&cmd.Debug, "debug", false, "debug flag")
+
+	flag.Var(&cmd.RootPaths, "root-path", "root paths that migration starts with")
+
+	flag.Parse()
+
+	if err := verifyVaultInfo("source", &cmd.Source); err != nil {
+		return err
+	}
+
+	if err := verifyVaultInfo("target", &cmd.Target); err != nil {
+		return err
+	}
+
+	if len(cmd.RootPaths) == 0 {
+		return errors.New("root-path should not be empty")
+	}
+
+	if cmd.Debug && cmd.DryRun {
+		fmt.Println("[WARN] dry run mode")
+	}
+	return nil
+}
+
+func verifyVaultInfo(id string, info *vaultInfo) error {
+	if info.Addr == "" {
+		return errors.New(id + "-addr is empty")
+	}
+	if info.Token == "" {
+		return errors.New(id + "-token is empty")
 	}
 	return nil
 }
