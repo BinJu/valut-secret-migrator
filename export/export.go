@@ -1,9 +1,9 @@
 package export
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/BinJu/vault-secret-migrator/client"
 	"github.com/BinJu/vault-secret-migrator/record"
@@ -39,8 +39,7 @@ func (e *exporter) export_func(paths []string, writer io.Writer) error {
 		if err != nil {
 			return err
 		}
-		secrets := strings.Split(secretsList, "\n")
-		for _, secret := range secrets[2:] {
+		for _, secret := range secretsList {
 			if secret == "" {
 				continue
 			}
@@ -53,8 +52,9 @@ func (e *exporter) export_func(paths []string, writer io.Writer) error {
 				if err != nil {
 					return err
 				}
+				valueStr, err := json.Marshal(value)
 				gExportCount += 1
-				kv := record.VaultSecret{Path: realPath, Value: value}
+				kv := record.VaultSecret{Path: realPath, Value: string(valueStr)}
 				_, err = fmt.Fprint(writer, kv.String())
 				if err != nil {
 					return err

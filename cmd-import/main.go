@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
-	"github.com/BinJu/vault-secret-migrator/client"
-	"github.com/BinJu/vault-secret-migrator/impt"
 	"os"
+
+	"github.com/BinJu/vault-secret-migrator/client/offline"
+	"github.com/BinJu/vault-secret-migrator/impt"
 )
 
 func main() {
@@ -19,7 +20,7 @@ func main() {
 		return
 	}
 	defer inputStream.Close()
-	importer := impt.NewImporter(client.NewVault())
+	importer := impt.NewImporter(offline.NewVault())
 	err := importer.Impt(inputStream)
 	if err != nil {
 		fmt.Println("ERROR: ", err)
